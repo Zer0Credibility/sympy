@@ -235,6 +235,9 @@ before_install:
   - if [[ "${TEST_SPHINX}" == "true" ]]; then
       pip install "sphinx==1.3.1" "docutils==0.12" doctr;
     fi
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "3.6" ]]; then
+      pip install matchpy;
+    fi
   - |
     if [[ "${TEST_MATPLOTLIB}" == "true" || "${TEST_SYMENGINE}" == "true" ]]; then
     # We do this conditionally because it saves us some downloading if the
