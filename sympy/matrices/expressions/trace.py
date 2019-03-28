@@ -43,12 +43,12 @@ class Trace(Expr):
         r = self.args[0]._eval_derivative_matrix_lines(x)
         for lr in r:
             if lr.higher == 1:
-                lr.higher *= lr.first * lr.second.T
+                lr.higher *= lr.first_pointer * lr.second_pointer.T
             else:
                 # This is not a matrix line:
-                lr.higher *= Trace(lr.first * lr.second.T)
-            lr.first = S.One
-            lr.second = S.One
+                lr.higher *= Trace(lr.first_pointer * lr.second_pointer.T)
+            lr.first_pointer = S.One
+            lr.second_pointer = S.One
         return r
 
     @property

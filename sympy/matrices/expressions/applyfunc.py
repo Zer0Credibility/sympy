@@ -85,6 +85,8 @@ class ElementwiseApplyFunction(MatrixExpr):
         return self.function(self.expr[i, j])
 
     def _eval_derivative_matrix_lines(self, x):
+        from sympy import HadamardProduct, hadamard_product, Mul, MatMul, Identity
+
         d = Dummy("d")
         function = self.function(d)
         fdiff = function.fdiff()
@@ -93,13 +95,48 @@ class ElementwiseApplyFunction(MatrixExpr):
         else:
             fdiff = Lambda(d, fdiff)
         lr = self.expr._eval_derivative_matrix_lines(x)
+        ewdiff = ElementwiseApplyFunction(fdiff, self.expr)
         if 1 in self.shape:
             # Vector:
-            ewdiff = ElementwiseApplyFunction(fdiff, self.expr)
+            iscolumn = self.shape[1] == 1
             ewdiff = diagonalize_vector(ewdiff)
-            # is it a vector or a matrix or a scalar?
-            lr[0].first *= ewdiff
-            return lr
+            # TODO: check which axis is not 1
+            for i in lr:
+                if iscolumn:
+                    ptr1 = [i.first_pointer]
+                    ptr2 = [Identity(ewdiff.shape[0])]
+                else:
+                    ptr1 = [Identity(ewdiff.shape[1])]
+                    ptr2 = [i.second_pointer]
+                i.first_pointer = ptr1  # [DiagonalizeVector, ptr1]
+                i.second_pointer = ptr2
+                i._first_pointer = ptr1
+                i._second_pointer = ptr2
+                # TODO: check if pointers point to two different lines:
+
+                # Unify lines:
+                #if iscolumn:
+                l = [j[0] for j in i._lines]
+
+                def mul(*args):
+                    return Mul.fromiter(args)
+
+                i._lines = [[hadamard_product, [[mul, [ewdiff, l[0]]], ptr2[0]]]]
+
         else:
             # Matrix case:
-            raise NotImplementedError
+            for i in lr:
+                ptr1 = [i.first_pointer]
+                ptr2 = [i.second_pointer]
+                i.first_pointer = [DiagonalizeVector, ptr1]
+                i.second_pointer = [DiagonalizeVector, ptr2]
+                i._first_pointer = ptr1
+                i._second_pointer = ptr2
+                # TODO: check if pointers point to two different lines:
+
+                # Unify lines:
+                l = [j[0] for j in i._lines]
+                i._lines = [[MatMul, [l[0], ewdiff, l[1]]]]
+            #i._lines[0]
+            #_LeftRightArgs([])
+        return lr
