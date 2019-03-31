@@ -626,13 +626,14 @@ def _matrix_derivative(expr, x):
     def _get_shape(elem):
         if isinstance(elem, MatrixExpr):
             return elem.shape
-        return (None, None)
+        return (1, 1)
 
     def get_rank(parts):
         return sum([j not in (1, None) for i in parts for j in _get_shape(i)])
 
     ranks = [get_rank(i) for i in parts]
-    assert len(set(ranks)) == 1
+    #ranks = [i for i in ranks if i not in (0, 1)]
+    #assert len(set(ranks)) == 1
     rank = ranks[0]
 
     def contract_one_dims(parts):
@@ -777,16 +778,15 @@ class MatrixSymbol(MatrixExpr):
 
     def _eval_derivative_matrix_lines(self, x):
         if self != x:
+            first = ZeroMatrix(x.shape[0], self.shape[0]) if self.shape[0] != 1 else S.Zero
+            second = ZeroMatrix(x.shape[1], self.shape[1]) if self.shape[1] != 1 else S.Zero
             return [_LeftRightArgs(
-                [
-                    ZeroMatrix(x.shape[0], self.shape[0]),
-                    ZeroMatrix(x.shape[1], self.shape[1]),
-                ],
+                [first, second],
                 transposed=False,
             )]
         else:
-            first = Identity(self.shape[0])
-            second = Identity(self.shape[1])
+            first = Identity(self.shape[0]) if self.shape[0] != 1 else S.One
+            second = Identity(self.shape[1]) if self.shape[1] != 1 else S.One
             return [_LeftRightArgs(
                 [first, second],
                 transposed=False,
@@ -975,6 +975,53 @@ class GenericZeroMatrix(ZeroMatrix):
         return super(GenericZeroMatrix, self).__hash__()
 
 
+class OneMatrix(MatrixExpr):
+    """The Matrix with all elements one.
+
+    Examples
+    ========
+
+    >>> from sympy import MatrixSymbol, OneMatrix
+    >>> A = MatrixSymbol('A', 1, 1)
+    >>> B = MatrixSymbol('B', 3, 3)
+    >>> O = OneMatrix(3, 5)
+    >>> A*O*B
+    A*O*B
+    """
+
+    def __new__(cls, m, n):
+        return super(OneMatrix, cls).__new__(cls, m, n)
+
+    @property
+    def shape(self):
+        return self.args[0], self.args[1]
+
+    @_sympifyit('other', NotImplemented)
+    @call_highest_priority('__rpow__')
+    def __pow__(self, other):
+        if other != 1 and not self.is_square:
+            raise ShapeError("Power of non-square matrix %s" % self)
+        if other == 0:
+            return Identity(self.rows)
+        if other < 1:
+            raise ValueError("Matrix det == 0; not invertible.")
+        return self
+
+    def _eval_transpose(self):
+        return OneMatrix(self.cols, self.rows)
+
+    def conjugate(self):
+        return self
+
+    def _entry(self, i, j, **kwargs):
+        return S.One
+
+    def __nonzero__(self):
+        return True
+
+    __bool__ = __nonzero__
+
+
 def matrix_symbols(expr):
     return [sym for sym in expr.free_symbols if sym.is_Matrix]
 
@@ -994,37 +1041,59 @@ class _LeftRightArgs(object):
     """
 
     def __init__(self, lines, higher=S.One, transposed=False):
-        self._lines = [[i] for i in lines]
-        self._first_pointer = self._lines[0]
-        self._second_pointer = self._lines[1]
+        self._lines = [i for i in lines]
+        self._first_pointer_parent = self._lines
+        self._first_pointer_index = 0
+        self._second_pointer_parent = self._lines
+        self._second_pointer_index = 1
         self.higher = higher
         self.transposed = transposed
 
     @property
     def first_pointer(self):
-        return self._first_pointer[0]
+        return self._first_pointer_parent[self._first_pointer_index]
 
     @first_pointer.setter
     def first_pointer(self, value):
-        self._first_pointer[0] = value
+        self._first_pointer_parent[self._first_pointer_index] = value
 
     @property
     def second_pointer(self):
-        return self._second_pointer[0]
+        return self._second_pointer_parent[self._second_pointer_index]
 
     @second_pointer.setter
     def second_pointer(self, value):
-        self._second_pointer[0] = value
+        self._second_pointer_parent[self._second_pointer_index] = value
+
+    def repoint_first(self, newpos):
+        lines = self._lines
+        for i in newpos:
+            lines = lines[i]
+        self._first_pointer_parent = lines
+        self._first_pointer_index = newpos[-1]
+
+    def repoint_second(self, newpos):
+        lines = self._lines
+        for i in newpos[:-1]:
+            lines = lines[i]
+        self._second_pointer_parent = lines
+        self._second_pointer_index = newpos[-1]
 
     def __repr__(self):
+        try:
+            built = [self._build(i) for i in self._lines]
+        except Exception:
+            built = self._lines
         return "_LeftRightArgs(lines=%s, higher=%s, transposed=%s)" % (
-            [i[0] for i in self._lines],
+            built,
             self.higher,
             self.transposed,
         )
 
     def transpose(self):
-        self.transposed = not self.transposed
+        self._first_pointer_parent, self._second_pointer_parent = self._second_pointer_parent, self._first_pointer_parent
+        self._first_pointer_index, self._second_pointer_index = self._second_pointer_index, self._first_pointer_index
+        #self.transposed = not self.transposed
         return self
 
     @staticmethod

@@ -81,6 +81,9 @@ class ElementwiseApplyFunction(MatrixExpr):
         else:
             return self
 
+    def as_explicit(self):
+        raise NotImplementedError
+
     def _entry(self, i, j, **kwargs):
         return self.function(self.expr[i, j])
 
@@ -96,7 +99,7 @@ class ElementwiseApplyFunction(MatrixExpr):
             fdiff = Lambda(d, fdiff)
         lr = self.expr._eval_derivative_matrix_lines(x)
         ewdiff = ElementwiseApplyFunction(fdiff, self.expr)
-        if 1 in self.shape:
+        if 1 in x.shape:
             # Vector:
             iscolumn = self.shape[1] == 1
             ewdiff = diagonalize_vector(ewdiff)
@@ -108,35 +111,51 @@ class ElementwiseApplyFunction(MatrixExpr):
                 else:
                     ptr1 = [Identity(ewdiff.shape[1])]
                     ptr2 = [i.second_pointer]
-                i.first_pointer = ptr1  # [DiagonalizeVector, ptr1]
-                i.second_pointer = ptr2
-                i._first_pointer = ptr1
-                i._second_pointer = ptr2
+                #i.first_pointer = ptr1  # [DiagonalizeVector, ptr1]
+                #i.second_pointer = ptr2
+                #i._first_pointer_parent
                 # TODO: check if pointers point to two different lines:
 
                 # Unify lines:
                 #if iscolumn:
-                l = [j[0] for j in i._lines]
+                #l = [j[0] for j in i._lines]
+                lines = i._lines
 
                 def mul(*args):
                     return Mul.fromiter(args)
 
-                i._lines = [[hadamard_product, [[mul, [ewdiff, l[0]]], ptr2[0]]]]
+                def hadamard_or_mul(arg1, arg2):
+                    if arg1.shape == arg2.shape:
+                        return hadamard_product(arg1, arg2)
+                    elif arg1.shape[1] == arg2.shape[0]:
+                        return MatMul(arg1, arg2).doit()
+                    elif arg1.shape[0] == arg2.shape[0]:
+                        return MatMul(arg2.T, arg1).doit()
+                    raise NotImplementedError
+
+                #i._lines = [[hadamard_product, [[mul, [ewdiff, l[0]]], ptr2[0]]]]
+                i._lines = [[hadamard_or_mul, [[mul, [ewdiff, ptr1[0]]], ptr2[0]]]]
+                i._first_pointer_parent = i._lines[0][1][0][1]
+                i._first_pointer_index = 1
+                i._second_pointer_parent = i._lines[0][1]
+                i._second_pointer_index = 1
 
         else:
             # Matrix case:
             for i in lr:
                 ptr1 = [i.first_pointer]
                 ptr2 = [i.second_pointer]
-                i.first_pointer = [DiagonalizeVector, ptr1]
-                i.second_pointer = [DiagonalizeVector, ptr2]
-                i._first_pointer = ptr1
-                i._second_pointer = ptr2
+                subexpr1 = [DiagonalizeVector, ptr1]
+                subexpr2 = [DiagonalizeVector, ptr2]
+                i.first_pointer = subexpr1
+                i.second_pointer = subexpr2
+                i._first_pointer_parent = subexpr1[1]
+                i._first_pointer_index = 0
+                i._second_pointer_parent = subexpr2[1]
+                i._second_pointer_index = 0
                 # TODO: check if pointers point to two different lines:
 
                 # Unify lines:
-                l = [j[0] for j in i._lines]
+                l = i._lines
                 i._lines = [[MatMul, [l[0], ewdiff, l[1]]]]
-            #i._lines[0]
-            #_LeftRightArgs([])
         return lr
