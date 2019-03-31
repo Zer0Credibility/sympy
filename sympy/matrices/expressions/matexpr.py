@@ -1110,6 +1110,7 @@ class _LeftRightArgs(object):
         data = [self._build(i) for i in self._lines]
         if self.higher != 1:
             data += [self._build(self.higher)]
+        data = [i.doit() for i in data]
         return data
 
     def matrix_form(self):

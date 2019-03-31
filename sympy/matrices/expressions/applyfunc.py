@@ -145,13 +145,21 @@ class ElementwiseApplyFunction(MatrixExpr):
             for i in lr:
                 ptr1 = [i.first_pointer]
                 ptr2 = [i.second_pointer]
-                subexpr1 = [DiagonalizeVector, ptr1]
-                subexpr2 = [DiagonalizeVector, ptr2]
+                # TODO: don't diagonalize vector if the pointer is contained within the function:
+                # e.g. sin(a' X b)
+                # but do diagonalize in a' sin(X) b:
+                # TODO: may it's just a matter of shape?
+                #subexpr1 = [DiagonalizeVector, ptr1]
+                #subexpr2 = [DiagonalizeVector, ptr2]
+                newptr1 = Identity(ptr1[0].shape[1])
+                newptr2 = Identity(ptr2[0].shape[1])
+                subexpr1 = [MatMul, [ptr1[0], [DiagonalizeVector, [newptr1]]]]
+                subexpr2 = [MatMul, [ptr2[0], [DiagonalizeVector, [newptr2]]]]
                 i.first_pointer = subexpr1
                 i.second_pointer = subexpr2
-                i._first_pointer_parent = subexpr1[1]
+                i._first_pointer_parent = subexpr1[1][1][1]
                 i._first_pointer_index = 0
-                i._second_pointer_parent = subexpr2[1]
+                i._second_pointer_parent = subexpr2[1][1][1]
                 i._second_pointer_index = 0
                 # TODO: check if pointers point to two different lines:
 
