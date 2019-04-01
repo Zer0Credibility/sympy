@@ -1051,7 +1051,7 @@ class _LeftRightArgs(object):
 
     @property
     def first_pointer(self):
-        return self._first_pointer_parent[self._first_pointer_index]
+       return self._first_pointer_parent[self._first_pointer_index]
 
     @first_pointer.setter
     def first_pointer(self, value):
@@ -1098,6 +1098,9 @@ class _LeftRightArgs(object):
 
     @staticmethod
     def _build(expr):
+        from sympy.core.expr import ExprBuilder
+        if isinstance(expr, ExprBuilder):
+            return expr.build()
         if isinstance(expr, list):
             if len(expr) == 1:
                 return expr[0]
@@ -1151,9 +1154,11 @@ class _LeftRightArgs(object):
 
     def append_first(self, other):
         self.first_pointer *= other
+        [self._build(i) for i in self._lines]
 
     def append_second(self, other):
         self.second_pointer *= other
+        [self._build(i) for i in self._lines]
 
     def __hash__(self):
         return hash((self.first, self.second, self.transposed))

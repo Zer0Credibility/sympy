@@ -88,7 +88,10 @@ class ElementwiseApplyFunction(MatrixExpr):
         return self.function(self.expr[i, j])
 
     def _eval_derivative_matrix_lines(self, x):
-        from sympy import HadamardProduct, hadamard_product, Mul, MatMul, Identity
+        from sympy import HadamardProduct, hadamard_product, Mul, MatMul, Identity, Transpose
+        from sympy.matrices.expressions.diagonal import diagonalize_vector
+        from sympy.matrices.expressions.matmul import validate as matmul_validate
+        from sympy.core.expr import ExprBuilder
 
         d = Dummy("d")
         function = self.function(d)
@@ -153,17 +156,37 @@ class ElementwiseApplyFunction(MatrixExpr):
                 #subexpr2 = [DiagonalizeVector, ptr2]
                 newptr1 = Identity(ptr1[0].shape[1])
                 newptr2 = Identity(ptr2[0].shape[1])
-                subexpr1 = [MatMul, [ptr1[0], [DiagonalizeVector, [newptr1]]]]
-                subexpr2 = [MatMul, [ptr2[0], [DiagonalizeVector, [newptr2]]]]
+                subexpr1 = [MatMul, [ptr1[0], [diagonalize_vector, [newptr1]]]]
+                subexpr2 = [MatMul, [[diagonalize_vector, [newptr2]], ptr2[0]]]
+                subexpr2 = [MatMul, [[Transpose, [[diagonalize_vector, [newptr2]]]], ptr2[0]]]
+                subexpr1 = ExprBuilder(
+                    MatMul,
+                    [ptr1[0], ExprBuilder(diagonalize_vector, [newptr1])],
+                    validator=matmul_validate,
+                )
+                subexpr2 = ExprBuilder(
+                    Transpose,
+                    [ExprBuilder(
+                        MatMul,
+                        [
+                            ptr2[0],
+                            ExprBuilder(diagonalize_vector, [newptr2])
+                            ,
+                        ],
+                    )],
+                    validator=matmul_validate,
+                )
                 i.first_pointer = subexpr1
                 i.second_pointer = subexpr2
-                i._first_pointer_parent = subexpr1[1][1][1]
+                i._first_pointer_parent = subexpr1.args[1].args  #subexpr1[1][1][1]
                 i._first_pointer_index = 0
-                i._second_pointer_parent = subexpr2[1][1][1]
+                #i._second_pointer_parent = subexpr2[1][0][1]
+                i._second_pointer_parent = subexpr2.args[0].args[1].args  #subexpr2[1][0][1][0][1]
                 i._second_pointer_index = 0
                 # TODO: check if pointers point to two different lines:
 
                 # Unify lines:
                 l = i._lines
-                i._lines = [[MatMul, [l[0], ewdiff, l[1]]]]
+                # TODO: check nested fucntions, e.g. log(sin(...)), the second function should be a scalar one.
+                i._lines = [ExprBuilder(MatMul, [l[0], ewdiff, l[1]], validator=matmul_validate)]
         return lr

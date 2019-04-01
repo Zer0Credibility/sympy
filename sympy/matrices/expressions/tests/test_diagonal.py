@@ -1,6 +1,6 @@
 from sympy.matrices.expressions import MatrixSymbol
 from sympy.matrices.expressions.diagonal import DiagonalMatrix, DiagonalOf, DiagonalizeVector, diagonalize_vector
-from sympy import Symbol, ask, Q, KroneckerDelta
+from sympy import Symbol, ask, Q, KroneckerDelta, Identity
 from sympy.utilities.pytest import raises
 
 
@@ -97,3 +97,8 @@ def test_DiagonalizeVector():
     d = diagonalize_vector(a)
     assert isinstance(d, MatrixSymbol)
     assert a == d
+    assert diagonalize_vector(Identity(3)) == Identity(3)
+    assert isinstance(DiagonalizeVector(Identity(3)), DiagonalizeVector)
+
+    # A diagonal matrix is equal to its transpose:
+    assert DiagonalizeVector(x).T == DiagonalizeVector(x)
