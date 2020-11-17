@@ -18,8 +18,10 @@ from sympy.utilities.decorator import doctest_depends_on
 
 __doctest_requires__ = {('lambdify',): ['numpy', 'tensorflow']}
 
+
 # Default namespaces, letting us define translations that can't be defined
 # by simple variable maps, like I => 1j
+
 MATH_DEFAULT = {}  # type: Dict[str, Any]
 MPMATH_DEFAULT = {}  # type: Dict[str, Any]
 NUMPY_DEFAULT = {"I": 1j}  # type: Dict[str, Any]
@@ -88,6 +90,7 @@ TENSORFLOW_TRANSLATIONS = {}  # type: Dict[str, str]
 
 TORCH_TRANSLATIONS = {}  # type: Dict[str, str]
 NUMEXPR_TRANSLATIONS = {}  # type: Dict[str, str]
+
 
 # Available modules:
 MODULES = {

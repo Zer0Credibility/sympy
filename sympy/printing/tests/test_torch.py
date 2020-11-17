@@ -22,13 +22,13 @@ N = MatrixSymbol("N", 3, 3)
 P = MatrixSymbol("P", 3, 3)
 Q = MatrixSymbol("Q", 3, 3)
 
+
 x, y, z, t = symbols("x y z t")
 
 if torch is not None:
     llo = [[j for j in range(i, i+3)] for i in range(0, 9, 3)]
     m3x3 = torch.tensor(llo)
     m3x3sympy = Matrix(llo)
-
 
 def _compare_torch_matrix(variables, expr):
     f = lambdify(variables, expr, 'torch')
@@ -105,12 +105,11 @@ def test_codegen_extra():
     # TODO: not implemented for diagonal
     #_compare_torch_matrix((M, N), cg)
 
-
 def test_torch_Derivative():
     expr = Derivative(sin(x), x)
     assert torch_code(expr) == 'torch.autograd.grad(torch.sin(x), x)[0]'
 
-
 # test_codegen_extra()
 # test_torch_matrix()
-test_torch_Derivative()
+# test_torch_Derivative()
+
